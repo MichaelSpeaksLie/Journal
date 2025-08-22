@@ -49,7 +49,15 @@
     <!-- Main App Container -->
     <section id="appContainer" style="display:none;" aria-label="Main App">
       <nav class="controls" aria-label="Main Controls">
-        <button class="btn" onclick="startTaskEntry()">795 Add Entry</button>
+        <button class="btn" onclick="startTaskEntry()">
+          <span class="btn-icon">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="9" y="4" width="2" height="12" fill="#61dafb"/>
+              <rect x="4" y="9" width="12" height="2" fill="#61dafb"/>
+            </svg>
+          </span>
+          Add Entry
+        </button>
         <button class="btn" onclick="showPrevTasks()">Prev. Tasks</button>
         <button class="btn" onclick="exportAndClear()">Export & Clear</button>
         <button class="btn" onclick="logout()">Logout</button>
