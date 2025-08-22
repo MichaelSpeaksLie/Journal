@@ -474,8 +474,7 @@ function showReportModal(reportTxt) {
   modal.innerHTML = `
     <h2>JOURNAL REPORT</h2>
     <div style="margin-bottom:16px;">
-      <button class="btn" onclick="downloadPDF()">Download PDF</button>
-      <button class="btn" onclick="clearAll()">Clear All</button>
+      <button class="btn" onclick="exportAndClearPDF()">Export & Clear</button>
     </div>
     <pre style="text-align:left; max-height:45vh; overflow:auto; background:#23242a; border-radius:8px; padding: 12px; font-family: monospace; font-size: 1em;">${reportTxt}</pre>
     <div class="modal-backdrop"></div>
@@ -483,6 +482,31 @@ function showReportModal(reportTxt) {
   document.body.appendChild(modal);
   window.reportTxt = reportTxt;
   document.querySelector('.modal-backdrop').onclick = modalRemove;
+// Export PDF and clear all tasks in one action
+function exportAndClearPDF() {
+  let doc = new window.jspdf.jsPDF();
+  let lines = window.reportTxt.split('\n');
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(12);
+  let marginLeft = 14;
+  let marginTop = 20;
+  let lineCount = 0;
+  for (let i = 0; i < lines.length; i++) {
+    doc.text(lines[i], marginLeft, marginTop + lineCount * 7);
+    lineCount++;
+    if ((marginTop + lineCount * 7) > 270) {
+      doc.addPage();
+      marginTop = 20;
+      lineCount = 0;
+    }
+  }
+  doc.save('Journal_Report.pdf');
+  // Clear all tasks after export
+  tasks = [];
+  saveTasks(tasks);
+  renderTasks();
+  modalRemove();
+}
 }
 
 function downloadPDF() {
