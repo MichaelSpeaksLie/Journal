@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -155,21 +156,75 @@
   </style>
 </head>
 <body>
-  <h1>Journal</h1>
-  <div class="controls">
+  <!-- Login Modal and Backdrop -->
+  <div id="loginModal" class="modal">
+    <h2>Login</h2>
+    <input type="text" id="loginUsername" placeholder="Email" />
+    <input type="password" id="loginPassword" placeholder="Password" />
+    <div class="modal-btn-group">
+      <button class="btn" id="loginBtn">Login</button>
+    </div>
+  </div>
+  <div id="loginBackdrop" class="modal-backdrop"></div>
+
+  <h1 id="journalHeader" style="display:none;">Journal</h1>
+  <div class="controls" id="journalControls" style="display:none;">
     <button class="btn" onclick="startTaskEntry()">➕ Add Entry</button>
     <button class="btn" onclick="showPrevTasks()">Prev. Tasks</button>
     <button class="btn" onclick="exportAndClear()">Export & Clear</button>
   </div>
-  <div id="tasks"></div>
+  <div id="tasks" style="display:none;"></div>
   <div id="notification"></div>
   <div id="report" style="display:none;"></div>
 
 <script>
+  // Predefined credentials
+  const validUsername = 'imanuragkrverma@gmail.com';
+  const validPassword = '23103920052340972004';
+
+  // On page load: show login modal, hide journal UI
+  window.onload = () => {
+    document.getElementById('journalHeader').style.display = 'none';
+    document.getElementById('journalControls').style.display = 'none';
+    document.getElementById('tasks').style.display = 'none';
+
+    document.getElementById('loginModal').style.display = 'block';
+    document.getElementById('loginBackdrop').style.display = 'block';
+  };
+
+  document.getElementById('loginBtn').onclick = function() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+
+    if (username === validUsername && password === validPassword) {
+      // Hide login modal & backdrop
+      document.getElementById('loginModal').style.display = 'none';
+      document.getElementById('loginBackdrop').style.display = 'none';
+
+      // Show journal UI
+      document.getElementById('journalHeader').style.display = 'block';
+      document.getElementById('journalControls').style.display = 'flex';
+      document.getElementById('tasks').style.display = 'block';
+
+      // Load tasks and render
+      tasks = loadTasks();
+      renderTasks();
+      checkNotifications();
+    } else {
+      alert('Invalid username or password.');
+    }
+  };
+
   let tasks = loadTasks();
   let notifDismissed = false;
-  renderTasks();
-  checkNotifications();
+
+  // Don't render tasks or notifications until login success
+
+  // All below functions as in your original code (startTaskEntry, stepDateInput, stepTypeInput, stepCategoryInput,
+  // stepDeadlineInput, stepTaskInput, getDaySections, selectOtherSection, saveTaskEntry, renderTasks,
+  // editEntry, editSingleTask, deleteSingleTask, showPrevTasks, checkNotifications, dismissNotif,
+  // exportAndClear, generateReport, showReportModal, downloadPDF, clearAll, createModal, modalRemove,
+  // saveTasks, loadTasks)
 
   function startTaskEntry() {
     stepDateInput();
@@ -269,7 +324,7 @@
     let prev = (day && day.sections[cat]) ? [...day.sections[cat]] : [];
     let combinedTasks = [...prev, ...newTasksArr];
     let modal = createModal(
-      `Add to ${cat} [${type === "future" ? ("Future, deadline: " + (deadline || day?.deadline || "")) : "Accomplished"}]`,
+      `Add to ${cat} [${type === "future" ? ("Future, deadline: " + (deadline || (day?.deadline || ""))) : "Accomplished"}]`,
       `
       <textarea id="taskText" placeholder="Type a task, press Add."></textarea>
       <div class="task-list">${combinedTasks.map((t, i) => `<div>${i + 1}. ${t}</div>`).join("")}</div>
@@ -305,7 +360,7 @@
 
   function selectOtherSection(date, type, deadline, gathered) {
     let otherCats = ["Tech", "Core", "Other"].filter(c => !gathered[c]);
-    if (otherCats.length === 0) { return; }
+    if (otherCats.length === 0) return;
     let modal = createModal('Do you want to add tasks for another section?', `
       <select id="otherCatSelect">
         <option value="">No, done</option>
@@ -325,15 +380,15 @@
   }
 
   function saveTaskEntry(date, type, cat, deadline, tasksArr) {
-    let today = new Date().toISOString().slice(0, 10);
     let day = tasks.find(t => t.date === date);
     if (!day) {
       day = {
-        date, type,
+        date,
+        type,
         deadline: type === "future" ? deadline : null,
         sections: {},
         completed: type === "accomplished",
-        missed: false
+        missed: false,
       };
       tasks.push(day);
     }
@@ -348,11 +403,8 @@
     let taskDiv = document.getElementById('tasks');
     taskDiv.innerHTML = "";
     let today = new Date().toISOString().slice(0, 10);
-
-    let sortTasks = [...tasks].sort((a, b) =>
-      a.date.localeCompare(b.date)
-    );
-    sortTasks.forEach((entry, idx) => {
+    let sortedTasks = [...tasks].sort((a, b) => a.date.localeCompare(b.date));
+    sortedTasks.forEach((entry, idx) => {
       let cats = Object.keys(entry.sections);
       let isFuture = entry.type === "future";
       let canEditOrDelete = isFuture || (entry.date === today);
@@ -363,30 +415,27 @@
       let sectionsHTML = cats.map(cat =>
         `<div class="section">
           <div class="section-header">${cat} (${entry.sections[cat].length} task${entry.sections[cat].length > 1 ? "s" : ""})</div>
-            <ol>
-              ${entry.sections[cat].map((t, i) => {
-                return `<li>${t}</li>`;
-              }).join('')}
-            </ol>
+          <ol>${entry.sections[cat].map(t => `<li>${t}</li>`).join('')}</ol>
         </div>`
       ).join("");
       taskDiv.innerHTML += `
-      <div class="note ${!canEditOrDelete ? 'disabled' : ''}">
+        <div class="note ${!canEditOrDelete ? 'disabled' : ''}">
           <div><strong>Date:</strong> ${entry.date} ${deadlineStr} <br>
-          <strong>Status:</strong> ${statusStr} </div>
+          <strong>Status:</strong> ${statusStr}</div>
           ${sectionsHTML}
-          ${canEditOrDelete ?
-          `<button class="btn" onclick="editEntry(${idx})">Edit</button>`
-          : ""
-        }
-      </div>`;
+          ${canEditOrDelete ? `<button class="btn" onclick="editEntry(${idx})">Edit</button>` : ""}
+        </div>
+      `;
     });
   }
 
   function editEntry(idx) {
     let entry = tasks[idx];
     let today = new Date().toISOString().slice(0, 10);
-    if (!entry.type === "future" && entry.date !== today) return alert("Can only edit today's tasks, or any future tasks.");
+    if (!(entry.type === "future" || entry.date === today)) {
+      alert("Can only edit today's tasks or any future tasks.");
+      return;
+    }
     let cats = Object.keys(entry.sections);
     let modal = createModal("Edit a task", `
       <select id="catEditSelect">${cats.map(c => `<option value="${c}">${c}</option>`).join("")}</select>
@@ -397,14 +446,18 @@
     document.getElementById("chooseCatEdit").onclick = () => {
       let cat = document.getElementById("catEditSelect").value;
       let tasksInCat = entry.sections[cat] || [];
-      if (tasksInCat.length === 0) { alert("No tasks in category."); return; }
+      if (tasksInCat.length === 0) {
+        alert("No tasks in category.");
+        return;
+      }
       let options = tasksInCat.map((t, i) => `<option value="${i}">${i + 1}. ${t}</option>`).join("");
-      document.getElementById("taskSelectDiv").innerHTML =
-        `<select id="taskNumSelect">${options}</select>
-          <div class="modal-btn-group">
-            <button class="btn" id="editSingleBtn">Edit Task</button>
-            <button class="btn" id="deleteSingleBtn">Delete Task</button>
-          </div>`;
+      document.getElementById("taskSelectDiv").innerHTML = `
+        <select id="taskNumSelect">${options}</select>
+        <div class="modal-btn-group">
+          <button class="btn" id="editSingleBtn">Edit Task</button>
+          <button class="btn" id="deleteSingleBtn">Delete Task</button>
+        </div>
+      `;
       document.getElementById("editSingleBtn").onclick = () => {
         editSingleTask(idx, cat);
       };
@@ -451,16 +504,17 @@
       let cats = Object.keys(entry.sections);
       let sectionsHTML = cats.map(cat =>
         `<div class="section">
-            <div class="section-header">${cat}</div>
-            <ol>${entry.sections[cat].map((t, i) => `<li>${t}</li>`).join('')}</ol>
-         </div>`
+          <div class="section-header">${cat}</div>
+          <ol>${entry.sections[cat].map((t, i) => `<li>${t}</li>`).join('')}</ol>
+        </div>`
       ).join("");
       return `
-      <div class="note">
+        <div class="note">
           <div><strong>Date:</strong> ${entry.date}</div>
           <span class="completed">Completed</span>
           ${sectionsHTML}
-      </div>`;
+        </div>
+      `;
     }).join("");
     taskDiv.innerHTML = html;
   }
@@ -479,8 +533,8 @@
     });
     saveTasks(tasks);
     if (futureTasks.length > 0 && !notifDismissed) {
-      toast.innerHTML =
-        `<div class="notif">
+      toast.innerHTML = `
+        <div class="notif">
           <span>🕒 You have some tasks to do.</span>
           <button class="close" onclick="dismissNotif()">✖</button>
         </div>`;
@@ -541,7 +595,7 @@
       </div>
       <pre style="text-align:left; max-height:45vh; overflow:auto; background:#23242a; border-radius:8px; padding: 12px; font-family: monospace; font-size: 1em;">${reportTxt}</pre>
       <div class="modal-backdrop"></div>
-      `;
+    `;
     document.body.appendChild(modal);
     window.reportTxt = reportTxt;
     document.querySelector('.modal-backdrop').onclick = modalRemove;
@@ -606,4 +660,3 @@
 </script>
 </body>
 </html>
-
