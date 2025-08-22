@@ -1,16 +1,18 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Journal with Firebase</title>
-  <script src="https://www.gstatic.com/firebasejs/9.21.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.21.0/firebase-firestore-compat.js"></script>
+  <title>Journal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Firebase App (the core Firebase SDK) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.2/firebase-app-compat.js"></script>
+  <!-- Firebase Realtime Database -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.2/firebase-database-compat.js"></script>
+  <!-- Firebase Auth -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.2/firebase-auth-compat.js"></script>
   <!-- Flatpickr CSS + JS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
-    /* Your existing styles */
     body {
       background: #18191A;
       color: #e4e6eb;
@@ -159,115 +161,139 @@
   </style>
 </head>
 <body>
-  <!-- Login Modal and Backdrop -->
-  <div id="loginModal" class="modal">
-    <h2>Login</h2>
-    <input type="text" id="loginUsername" placeholder="Email" />
-    <input type="password" id="loginPassword" placeholder="Password" />
-    <div class="modal-btn-group">
-      <button class="btn" id="loginBtn">Login</button>
+  <h1>Journal</h1>
+  <div id="loginContainer">
+    <form id="loginForm" style="max-width:340px;margin:40px auto 0 auto;padding:24px;background:#23242a;border-radius:10px;box-shadow:0 2px 12px #19191944;">
+      <h2 style="color:#61dafb;">Login</h2>
+      <input type="email" id="loginEmail" placeholder="Email" required value="imanuragkrverma@gmail.com" style="margin-bottom:12px;">
+      <input type="password" id="loginPassword" placeholder="Password" required value="23103920052340972004" style="margin-bottom:12px;">
+      <button class="btn" type="submit">Login</button>
+      <div id="loginError" style="color:#ff2266;margin-top:10px;"></div>
+    </form>
+  </div>
+  <div id="appContainer" style="display:none;">
+    <div class="controls">
+      <button class="btn" onclick="startTaskEntry()">➕ Add Entry</button>
+      <button class="btn" onclick="showPrevTasks()">Prev. Tasks</button>
+      <button class="btn" onclick="exportAndClear()">Export & Clear</button>
+      <button class="btn" onclick="logout()">Logout</button>
     </div>
+    <div id="tasks"></div>
+    <div id="notification"></div>
+    <div id="report" style="display:none;"></div>
   </div>
-  <div id="loginBackdrop" class="modal-backdrop"></div>
-
-  <h1 id="journalHeader" style="display:none;">Journal</h1>
-  <div class="controls" id="journalControls" style="display:none;">
-    <button class="btn" onclick="startTaskEntry()">➕ Add Entry</button>
-    <button class="btn" onclick="showPrevTasks()">Prev. Tasks</button>
-    <button class="btn" onclick="exportAndClear()">Export & Clear</button>
-  </div>
-  <div id="tasks" style="display:none;"></div>
-  <div id="notification"></div>
-  <div id="report" style="display:none;"></div>
 
 <script>
-  // Firebase Setup and Initialization
+  // Firebase config
   const firebaseConfig = {
-    apiKey: "AIzaSyBasVyqim7LQnKHlKZ2njf-maWNCDCsOmY",
-    authDomain: "journal-6a55d.firebaseapp.com",
-    projectId: "journal-6a55d",
-    storageBucket: "journal-6a55d.firebasestorage.app",
-    messagingSenderId: "1064999570652",
-    appId: "1:1064999570652:web:283fece44cf616f8b57819",
-    measurementId: "G-ZM2QM25YE0"
+    apiKey: "AIzaSyDYgLGTH8W6PDw_nd-YZgCLHThF_Lkf3Bg",
+    authDomain: "journal-d570e.firebaseapp.com",
+    databaseURL: "https://journal-d570e-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "journal-d570e",
+    storageBucket: "journal-d570e.firebasestorage.app",
+    messagingSenderId: "625726240720",
+    appId: "1:625726240720:web:a064b16b8f1ba8fb6f6bd5",
+    measurementId: "G-H1EF9X452X"
   };
+
+  // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+  const database = firebase.database();
+  const auth = firebase.auth();
 
-  // Predefined login credentials
-  const validUsername = 'imanuragkrverma@gmail.com';
-  const validPassword = '23103920052340972004';
+  // Show/hide app based on auth state
+  auth.onAuthStateChanged(function(user) {
+    if (user && user.email === "imanuragkrverma@gmail.com") {
+      document.getElementById('loginContainer').style.display = 'none';
+      document.getElementById('appContainer').style.display = '';
+      loadTasksFromDatabase();
+    } else {
+      document.getElementById('loginContainer').style.display = '';
+      document.getElementById('appContainer').style.display = 'none';
+    }
+  });
 
-  // Application state
+  // Login form handler
+  document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+      loginForm.onsubmit = function(e) {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        auth.signInWithEmailAndPassword(email, password)
+          .then(() => {
+            document.getElementById('loginError').textContent = '';
+          })
+          .catch(err => {
+            document.getElementById('loginError').textContent = err.message;
+          });
+      };
+    }
+  });
+
+  // Logout function
+  function logout() {
+    auth.signOut();
+  }
+
   let tasks = [];
   let notifDismissed = false;
 
-  // Login modal handling
-  window.onload = () => {
-    document.getElementById('journalHeader').style.display = 'none';
-    document.getElementById('journalControls').style.display = 'none';
-    document.getElementById('tasks').style.display = 'none';
-
-    document.getElementById('loginModal').style.display = 'block';
-    document.getElementById('loginBackdrop').style.display = 'block';
-  };
-
-  document.getElementById('loginBtn').onclick = async function() {
-    const username = document.getElementById('loginUsername').value.trim();
-    const password = document.getElementById('loginPassword').value;
-    if (username === validUsername && password === validPassword) {
-      document.getElementById('loginModal').style.display = 'none';
-      document.getElementById('loginBackdrop').style.display = 'none';
-
-      document.getElementById('journalHeader').style.display = 'block';
-      document.getElementById('journalControls').style.display = 'flex';
-      document.getElementById('tasks').style.display = 'block';
-
-      await loadTasksFromFirestore();
-      renderTasks();
-      checkNotifications();
-    } else {
-      alert('Invalid username or password.');
-    }
-  };
-
-  // Load tasks from Firestore
-  async function loadTasksFromFirestore() {
+  // Load tasks from Realtime Database at start
+  async function loadTasksFromDatabase() {
     try {
-      const docRef = db.collection("journals").doc("userTasks");
-      const docSnap = await docRef.get();
-      if (docSnap.exists) {
-        tasks = docSnap.data().tasks || [];
+      console.log("Attempting to load tasks from database...");
+      const snapshot = await database.ref('journals/userTasks').once('value');
+      console.log("Database snapshot:", snapshot.val());
+      if (snapshot.exists()) {
+        tasks = snapshot.val().tasks || [];
       } else {
         tasks = [];
       }
-    } catch (e) {
-      console.error("Error loading from Firestore", e);
+      console.log("Loaded tasks:", tasks);
+      renderTasks();
+      checkNotifications();
+    } catch (error) {
+      console.error("Error loading tasks from Realtime Database:", error);
       tasks = [];
+      renderTasks();
     }
   }
 
-  // Save tasks to Firestore
-  async function saveTasksToFirestore() {
+  // Save tasks to Realtime Database
+  async function saveTasksToDatabase(tasksArray) {
     try {
-      await db.collection("journals").doc("userTasks").set({ tasks });
-      console.log("Tasks saved to Firestore");
-    } catch (e) {
-      console.error("Error saving to Firestore", e);
+      console.log("Attempting to save tasks:", tasksArray);
+      console.log("Current user:", auth.currentUser);
+      console.log("Database reference:", database.ref('journals/userTasks'));
+      
+      const result = await database.ref('journals/userTasks').set({ tasks: tasksArray });
+      console.log("Save result:", result);
+      console.log("Tasks saved to Realtime Database successfully");
+    } catch (error) {
+      console.error("Error saving tasks to Realtime Database:", error);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
     }
   }
 
-  // Override storage operations
+  // Replace local save/load functions with Realtime Database versions
   function saveTasks(ts) {
-    tasks = ts;
-    saveTasksToFirestore();
+    console.log("🔥 FIREBASE saveTasks function called with:", ts);
+    saveTasksToDatabase(ts);
   }
+
   function loadTasks() {
-    // synchronous fallback: return current tasks array
+    // This function is now async; provide a dummy fallback for sync calls before data load
     return tasks;
   }
 
-  // ---------------- Existing journal app JS functions -----------------
+  // On page load, fetch tasks from Realtime Database
+  window.onload = () => {
+  // Auth state will trigger loadTasksFromDatabase after login
+  };
+  // ...existing code...
 
   function startTaskEntry() {
     stepDateInput();
@@ -285,7 +311,7 @@
 
     flatpickr("#dateInput", {
       dateFormat: "Y-m-d",
-      onChange: (selectedDates, dateStr) => {
+      onChange: function(selectedDates, dateStr) {
         document.getElementById('nextBtn').disabled = !dateStr;
       },
       allowInput: true
@@ -346,7 +372,7 @@
     flatpickr("#deadlineInput", {
       enableTime: true,
       dateFormat: "Y-m-d H:i",
-      onChange: (selectedDates, dateStr) => {
+      onChange: function(selectedDates, dateStr) {
         document.getElementById("deadNextBtn").disabled = !dateStr;
       },
       allowInput: true
@@ -367,7 +393,7 @@
     let prev = (day && day.sections[cat]) ? [...day.sections[cat]] : [];
     let combinedTasks = [...prev, ...newTasksArr];
     let modal = createModal(
-      `Add to ${cat} [${type === "future" ? ("Future, deadline: " + (deadline || (day?.deadline || ""))) : "Accomplished"}]`,
+      `Add to ${cat} [${type === "future" ? ("Future, deadline: " + (deadline || day?.deadline || "")) : "Accomplished"}]`,
       `
       <textarea id="taskText" placeholder="Type a task, press Add."></textarea>
       <div class="task-list">${combinedTasks.map((t, i) => `<div>${i + 1}. ${t}</div>`).join("")}</div>
@@ -403,7 +429,7 @@
 
   function selectOtherSection(date, type, deadline, gathered) {
     let otherCats = ["Tech", "Core", "Other"].filter(c => !gathered[c]);
-    if (otherCats.length === 0) return;
+    if (otherCats.length === 0) { return; }
     let modal = createModal('Do you want to add tasks for another section?', `
       <select id="otherCatSelect">
         <option value="">No, done</option>
@@ -423,21 +449,28 @@
   }
 
   function saveTaskEntry(date, type, cat, deadline, tasksArr) {
+    console.log("saveTaskEntry called with:", { date, type, cat, deadline, tasksArr });
+    let today = new Date().toISOString().slice(0, 10);
     let day = tasks.find(t => t.date === date);
     if (!day) {
       day = {
-        date,
-        type,
+        date, type,
         deadline: type === "future" ? deadline : null,
         sections: {},
         completed: type === "accomplished",
-        missed: false,
+        missed: false
       };
       tasks.push(day);
     }
     day.sections[cat] = tasksArr;
     if (type === "future") day.deadline = deadline;
-    saveTasks(tasks);
+    console.log("About to call saveTasks with:", tasks);
+    try {
+      saveTasks(tasks);
+      console.log("saveTasks completed successfully");
+    } catch (error) {
+      console.error("Error calling saveTasks:", error);
+    }
     renderTasks();
     checkNotifications();
   }
@@ -446,8 +479,11 @@
     let taskDiv = document.getElementById('tasks');
     taskDiv.innerHTML = "";
     let today = new Date().toISOString().slice(0, 10);
-    let sortedTasks = [...tasks].sort((a, b) => a.date.localeCompare(b.date));
-    sortedTasks.forEach((entry, idx) => {
+
+    let sortTasks = [...tasks].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+    sortTasks.forEach((entry, idx) => {
       let cats = Object.keys(entry.sections);
       let isFuture = entry.type === "future";
       let canEditOrDelete = isFuture || (entry.date === today);
@@ -458,27 +494,30 @@
       let sectionsHTML = cats.map(cat =>
         `<div class="section">
           <div class="section-header">${cat} (${entry.sections[cat].length} task${entry.sections[cat].length > 1 ? "s" : ""})</div>
-          <ol>${entry.sections[cat].map(t => `<li>${t}</li>`).join('')}</ol>
+            <ol>
+              ${entry.sections[cat].map((t, i) => {
+                return `<li>${t}</li>`;
+              }).join('')}
+            </ol>
         </div>`
       ).join("");
       taskDiv.innerHTML += `
-        <div class="note ${!canEditOrDelete ? 'disabled' : ''}">
+      <div class="note ${!canEditOrDelete ? 'disabled' : ''}">
           <div><strong>Date:</strong> ${entry.date} ${deadlineStr} <br>
-          <strong>Status:</strong> ${statusStr}</div>
+          <strong>Status:</strong> ${statusStr} </div>
           ${sectionsHTML}
-          ${canEditOrDelete ? `<button class="btn" onclick="editEntry(${idx})">Edit</button>` : ""}
-        </div>
-      `;
+          ${canEditOrDelete ?
+          `<button class="btn" onclick="editEntry(${idx})">Edit</button>`
+          : ""
+        }
+      </div>`;
     });
   }
 
   function editEntry(idx) {
     let entry = tasks[idx];
     let today = new Date().toISOString().slice(0, 10);
-    if (!(entry.type === "future" || entry.date === today)) {
-      alert("Can only edit today's tasks or any future tasks.");
-      return;
-    }
+    if (!entry.type === "future" && entry.date !== today) return alert("Can only edit today's tasks, or any future tasks.");
     let cats = Object.keys(entry.sections);
     let modal = createModal("Edit a task", `
       <select id="catEditSelect">${cats.map(c => `<option value="${c}">${c}</option>`).join("")}</select>
@@ -489,18 +528,14 @@
     document.getElementById("chooseCatEdit").onclick = () => {
       let cat = document.getElementById("catEditSelect").value;
       let tasksInCat = entry.sections[cat] || [];
-      if (tasksInCat.length === 0) {
-        alert("No tasks in category.");
-        return;
-      }
+      if (tasksInCat.length === 0) { alert("No tasks in category."); return; }
       let options = tasksInCat.map((t, i) => `<option value="${i}">${i + 1}. ${t}</option>`).join("");
-      document.getElementById("taskSelectDiv").innerHTML = `
-        <select id="taskNumSelect">${options}</select>
-        <div class="modal-btn-group">
-          <button class="btn" id="editSingleBtn">Edit Task</button>
-          <button class="btn" id="deleteSingleBtn">Delete Task</button>
-        </div>
-      `;
+      document.getElementById("taskSelectDiv").innerHTML =
+        `<select id="taskNumSelect">${options}</select>
+          <div class="modal-btn-group">
+            <button class="btn" id="editSingleBtn">Edit Task</button>
+            <button class="btn" id="deleteSingleBtn">Delete Task</button>
+          </div>`;
       document.getElementById("editSingleBtn").onclick = () => {
         editSingleTask(idx, cat);
       };
@@ -535,10 +570,17 @@
 
   function showPrevTasks() {
     let taskDiv = document.getElementById('tasks');
-    let pastList = tasks.filter(t =>
-      t.type === "accomplished" &&
-      t.date < new Date().toISOString().slice(0, 10)
-    );
+    let today = new Date().toISOString().slice(0, 10);
+    console.log("Today's date:", today);
+    console.log("All tasks:", tasks);
+    
+    let pastList = tasks.filter(t => {
+      console.log(`Task date: ${t.date}, type: ${t.type}, is before today: ${t.date < today}`);
+      return t.type === "accomplished" && t.date < today;
+    });
+    
+    console.log("Past tasks found:", pastList);
+    
     if (pastList.length === 0) {
       alert("No previous tasks found.");
       return;
@@ -547,17 +589,16 @@
       let cats = Object.keys(entry.sections);
       let sectionsHTML = cats.map(cat =>
         `<div class="section">
-          <div class="section-header">${cat}</div>
-          <ol>${entry.sections[cat].map((t, i) => `<li>${t}</li>`).join('')}</ol>
-        </div>`
+            <div class="section-header">${cat}</div>
+            <ol>${entry.sections[cat].map((t, i) => `<li>${t}</li>`).join('')}</ol>
+         </div>`
       ).join("");
       return `
-        <div class="note">
+      <div class="note">
           <div><strong>Date:</strong> ${entry.date}</div>
           <span class="completed">Completed</span>
           ${sectionsHTML}
-        </div>
-      `;
+      </div>`;
     }).join("");
     taskDiv.innerHTML = html;
   }
@@ -576,8 +617,8 @@
     });
     saveTasks(tasks);
     if (futureTasks.length > 0 && !notifDismissed) {
-      toast.innerHTML = `
-        <div class="notif">
+      toast.innerHTML =
+        `<div class="notif">
           <span>🕒 You have some tasks to do.</span>
           <button class="close" onclick="dismissNotif()">✖</button>
         </div>`;
@@ -638,7 +679,7 @@
       </div>
       <pre style="text-align:left; max-height:45vh; overflow:auto; background:#23242a; border-radius:8px; padding: 12px; font-family: monospace; font-size: 1em;">${reportTxt}</pre>
       <div class="modal-backdrop"></div>
-    `;
+      `;
     document.body.appendChild(modal);
     window.reportTxt = reportTxt;
     document.querySelector('.modal-backdrop').onclick = modalRemove;
@@ -688,6 +729,12 @@
   function modalRemove() {
     document.querySelectorAll('.modal,.modal-backdrop').forEach(el => el.remove());
   }
+
+  function loadTasks() {
+  // Now handled by Firestore
+  return tasks;
+  }
 </script>
 </body>
 </html>
+
