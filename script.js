@@ -11,7 +11,7 @@ let notifDismissed = false;
 
 // Show/hide app based on auth state
 auth.onAuthStateChanged(function(user) {
-  if (user && user.email === "imanuragkrverma@gmail.com") {
+  if (user && user.email) {
     document.getElementById('loginContainer').style.display = 'none';
     document.getElementById('appContainer').style.display = '';
     loadTasksFromDatabase();
