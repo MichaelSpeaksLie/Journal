@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Journal</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <title>Journal with Firebase</title>
+  <script src="https://www.gstatic.com/firebasejs/9.21.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.21.0/firebase-firestore-compat.js"></script>
   <!-- Flatpickr CSS + JS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
+    /* Your existing styles */
     body {
       background: #18191A;
       color: #e4e6eb;
@@ -178,11 +181,28 @@
   <div id="report" style="display:none;"></div>
 
 <script>
-  // Predefined credentials
+  // Firebase Setup and Initialization
+  const firebaseConfig = {
+    apiKey: "AIzaSyBasVyqim7LQnKHlKZ2njf-maWNCDCsOmY",
+    authDomain: "journal-6a55d.firebaseapp.com",
+    projectId: "journal-6a55d",
+    storageBucket: "journal-6a55d.firebasestorage.app",
+    messagingSenderId: "1064999570652",
+    appId: "1:1064999570652:web:283fece44cf616f8b57819",
+    measurementId: "G-ZM2QM25YE0"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // Predefined login credentials
   const validUsername = 'imanuragkrverma@gmail.com';
   const validPassword = '23103920052340972004';
 
-  // On page load: show login modal, hide journal UI
+  // Application state
+  let tasks = [];
+  let notifDismissed = false;
+
+  // Login modal handling
   window.onload = () => {
     document.getElementById('journalHeader').style.display = 'none';
     document.getElementById('journalControls').style.display = 'none';
@@ -192,22 +212,18 @@
     document.getElementById('loginBackdrop').style.display = 'block';
   };
 
-  document.getElementById('loginBtn').onclick = function() {
+  document.getElementById('loginBtn').onclick = async function() {
     const username = document.getElementById('loginUsername').value.trim();
     const password = document.getElementById('loginPassword').value;
-
     if (username === validUsername && password === validPassword) {
-      // Hide login modal & backdrop
       document.getElementById('loginModal').style.display = 'none';
       document.getElementById('loginBackdrop').style.display = 'none';
 
-      // Show journal UI
       document.getElementById('journalHeader').style.display = 'block';
       document.getElementById('journalControls').style.display = 'flex';
       document.getElementById('tasks').style.display = 'block';
 
-      // Load tasks and render
-      tasks = loadTasks();
+      await loadTasksFromFirestore();
       renderTasks();
       checkNotifications();
     } else {
@@ -215,16 +231,43 @@
     }
   };
 
-  let tasks = loadTasks();
-  let notifDismissed = false;
+  // Load tasks from Firestore
+  async function loadTasksFromFirestore() {
+    try {
+      const docRef = db.collection("journals").doc("userTasks");
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        tasks = docSnap.data().tasks || [];
+      } else {
+        tasks = [];
+      }
+    } catch (e) {
+      console.error("Error loading from Firestore", e);
+      tasks = [];
+    }
+  }
 
-  // Don't render tasks or notifications until login success
+  // Save tasks to Firestore
+  async function saveTasksToFirestore() {
+    try {
+      await db.collection("journals").doc("userTasks").set({ tasks });
+      console.log("Tasks saved to Firestore");
+    } catch (e) {
+      console.error("Error saving to Firestore", e);
+    }
+  }
 
-  // All below functions as in your original code (startTaskEntry, stepDateInput, stepTypeInput, stepCategoryInput,
-  // stepDeadlineInput, stepTaskInput, getDaySections, selectOtherSection, saveTaskEntry, renderTasks,
-  // editEntry, editSingleTask, deleteSingleTask, showPrevTasks, checkNotifications, dismissNotif,
-  // exportAndClear, generateReport, showReportModal, downloadPDF, clearAll, createModal, modalRemove,
-  // saveTasks, loadTasks)
+  // Override storage operations
+  function saveTasks(ts) {
+    tasks = ts;
+    saveTasksToFirestore();
+  }
+  function loadTasks() {
+    // synchronous fallback: return current tasks array
+    return tasks;
+  }
+
+  // ---------------- Existing journal app JS functions -----------------
 
   function startTaskEntry() {
     stepDateInput();
@@ -242,7 +285,7 @@
 
     flatpickr("#dateInput", {
       dateFormat: "Y-m-d",
-      onChange: function(selectedDates, dateStr) {
+      onChange: (selectedDates, dateStr) => {
         document.getElementById('nextBtn').disabled = !dateStr;
       },
       allowInput: true
@@ -303,7 +346,7 @@
     flatpickr("#deadlineInput", {
       enableTime: true,
       dateFormat: "Y-m-d H:i",
-      onChange: function(selectedDates, dateStr) {
+      onChange: (selectedDates, dateStr) => {
         document.getElementById("deadNextBtn").disabled = !dateStr;
       },
       allowInput: true
@@ -644,18 +687,6 @@
 
   function modalRemove() {
     document.querySelectorAll('.modal,.modal-backdrop').forEach(el => el.remove());
-  }
-
-  function saveTasks(ts) {
-    localStorage.setItem('journalTasks', JSON.stringify(ts));
-  }
-
-  function loadTasks() {
-    try {
-      return JSON.parse(localStorage.getItem('journalTasks') || '[]');
-    } catch {
-      return [];
-    }
   }
 </script>
 </body>
